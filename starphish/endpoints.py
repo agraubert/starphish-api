@@ -5,15 +5,34 @@ import requests
 import os
 import traceback
 
+
+@app.errorhandler(404)
+@utils.log_request
+def NotFound(err=None):
+    return 'Not Found', 404
+
 @app.route('/')
+@utils.log_request
 def redir():
     return redirect("https://starphish.wixsite.com/my-site")
 
 @app.route('/api/marco')
+@utils.log_request
 def marco():
     return "Polo"
 
+@app.route('/api/_internal/request_log')
+@utils.log_request
+def request_logs():
+    if 'token' not in request.args or request.args['token'] != app.config['INTERNAL_TOKEN']:
+        return NotFound.not_logged()
+
+    with utils.Database.get_db(app.config) as db:
+        print(db._tables)
+        return db.read_table('requests').to_html(), 200
+
 @app.route('/api/safebrowse', methods=['POST'])
+@utils.log_request
 @utils.enforce_content_length
 def safebrowse():
     try:
