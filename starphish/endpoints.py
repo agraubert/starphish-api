@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timedelta
 import traceback
 import sqlalchemy as sqla
+from hashlib import sha256
 
 
 @app.errorhandler(404)
@@ -109,6 +110,7 @@ def safebrowse():
                 ([
                     {
                         'url': match['threat']['url'],
+                        'url_hash': sha256(url.encode()).hexdigest(),
                         'expires': now + timedelta(seconds=300),
                         'safe': False,
                         'type': match['threatType']
@@ -117,6 +119,7 @@ def safebrowse():
                 ] if 'matches' in response_data else []) + [
                     {
                         'url': url,
+                        'url_hash': sha256(url.encode()).hexdigest(),
                         'expires': now + timedelta(seconds=60),
                         'safe': True,
                     }

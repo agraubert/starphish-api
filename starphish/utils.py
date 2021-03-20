@@ -269,7 +269,8 @@ def table_defs(db):
         db.create_table(
             'safebrowse_cache',
             db.meta,
-            sqla.Column('url', sqla.Text, primary_key=True),
+            sqla.Column('url_hash', sqla.String(64), primary_key=True),
+            sqla.Column('url', sqla.Text, nullable=False),
             sqla.Column('expires', sqla.DateTime, primary_key=True),
             sqla.Column('safe', sqla.Boolean, nullable=False),
             sqla.Column('type', sqla.String(64)),
