@@ -35,8 +35,8 @@ def rate_limit(limit):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if 'CUSTOM_LIMITS' in current_app.config and request.remote_addr in current_app.config['CUSTOM_LIMITS']:
-                limit = current_app.config['CUSTOM_LIMITS'][request.remote_addr]
+            # if 'CUSTOM_LIMITS' in current_app.config and request.remote_addr in current_app.config['CUSTOM_LIMITS']:
+            #     limit = current_app.config['CUSTOM_LIMITS'][request.remote_addr]
             with Database.get_db(current_app.config) as db:
                 table = db._tables['ratelimit']
                 quota = db.query(
