@@ -3,7 +3,9 @@ from . import utils
 from flask import request, redirect
 import requests
 import os
+from datetime import datetime, timedelta
 import traceback
+import sqlalchemy as sqla
 
 
 @app.errorhandler(404)
@@ -28,12 +30,12 @@ def request_logs():
         return NotFound.not_logged()
 
     with utils.Database.get_db(app.config) as db:
-        print(db._tables)
-        return db.read_table('requests').to_html(), 200
+        return db.read_table('requests').set_index('id').to_html(), 200
 
 @app.route('/api/safebrowse', methods=['POST'])
 @utils.log_request
 @utils.enforce_content_length
+@utils.rate_limit(10)
 def safebrowse():
     try:
 
@@ -50,6 +52,26 @@ def safebrowse():
         if not len(data['urls']):
             return utils.error('Invalid request format. Empty list of urls', data=data)
 
+        cached = False
+
+        query_urls = []
+        cache_matches = {}
+
+        with utils.Database.get_db(app.config) as db:
+            table = db._tables['safebrowse_cache']
+            results = db.query(
+                sqla.select(table).where(
+                    table.c.expires > sqla.text(datetime.now().strftime("'%Y-%m-%d %H:%M:%S'"))
+                )
+            )
+            for url in data['urls']:
+                if url in results['url'].unique():
+                    cached = True
+                    if not results[results['url'] == url]['safe'].all():
+                        cache_matches[url] = results[results['url'] == url].query('type == type')['type'][-1]
+                else:
+                    query_urls.append(url)
+
         response = requests.post(
             'https://safebrowsing.googleapis.com/v4/threatMatches:find',
             params={'key': app.config['SAFEBROWSING_API_KEY']},
@@ -65,7 +87,7 @@ def safebrowse():
                     "threatEntryTypes": ["URL"],
                     "threatEntries": [
                         {'url': url}
-                        for url in data['urls']
+                        for url in query_urls
                     ]
                 }
             }
@@ -78,10 +100,49 @@ def safebrowse():
                 code=response.status_code if response.status_code >= 400 else 500
             )
         response_data = response.json()
+        unsafe = {match['threat']['url'] for match in response_data['matches']} if 'matches' in response_data else set()
+        now = datetime.now()
+
+        with utils.Database.get_db(app.config) as db:
+            db.multi_insert(
+                'safebrowse_cache',
+                ([
+                    {
+                        'url': match['threat']['url'],
+                        'expires': now + timedelta(seconds=300),
+                        'safe': False,
+                        'type': match['threatType']
+                    }
+                    for match in response_data['matches']
+                ] if 'matches' in response_data else []) + [
+                    {
+                        'url': url,
+                        'expires': now + timedelta(seconds=60),
+                        'safe': True,
+                    }
+                    for url in query_urls if url not in unsafe
+                ]
+            )
         return {
             'success': True,
-            'length': len(response_data['matches']) if 'matches' in response_data else 0,
-            'matches': response_data['matches'] if 'matches' in response_data else [],
+            'length': len(cache_matches) + (len(response_data['matches']) if 'matches' in response_data else 0),
+            'matches': [
+                {
+                    'url': url,
+                    'threatType': threat
+                }
+                for url, threat in cache_matches.items()
+            ] + (
+                [
+                    {
+                        'url': match['threat']['url'],
+                        'threatType': match['threatType']
+                    }
+                    for match in response_data['matches']
+                ]
+                if 'matches' in response_data else []
+            ),
+            'cached': cached,
         }
     except:
         return utils.error(
