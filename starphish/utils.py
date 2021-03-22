@@ -119,6 +119,9 @@ def log_request(func):
 
     return wrapper
 
+def ensure_scheme(url):
+    return "http://{}".format(url) if not urlparse(url).scheme else url
+
 def standardize_urls(urls):
     """
     Standardizes query urls to maximize probability of a match
@@ -128,11 +131,9 @@ def standardize_urls(urls):
     """
     for url in urls:
         result = urlparse(url.lower())
-        yield url if result.path else url.lower()
-        if result.path:
-            yield '{}{}{}'.format(result.scheme, '://' if result.scheme else '', result.netloc).lower()
-        if not result.scheme:
-            yield 'http://{}'.format(result.netloc).lower()
+        yield ensure_scheme(url if result.path else url.lower())
+        if result.path and result.netloc:            
+            yield ensure_scheme(result.netloc.lower())
 
 
 DATABASE = None
