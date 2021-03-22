@@ -21,6 +21,7 @@ def redir():
 
 @app.route('/api/marco')
 @utils.log_request
+@utils.rate_limit(5)
 def marco():
     return "Polo"
 
@@ -65,13 +66,14 @@ def safebrowse():
                     table.c.expires > sqla.text(datetime.now().strftime("'%Y-%m-%d %H:%M:%S'"))
                 )
             )
-            for url in data['urls']:
+            for url in utils.standardize_urls(data['urls']):
                 if url in results['url'].unique():
                     cached = True
                     if not results[results['url'] == url]['safe'].all():
                         cache_matches[url] = results[results['url'] == url].query('type == type')['type'][-1]
                 else:
                     query_urls.append(url)
+        print(query_urls)
 
         response = requests.post(
             'https://safebrowsing.googleapis.com/v4/threatMatches:find',
@@ -82,9 +84,8 @@ def safebrowse():
                     "clientVersion": "0.0.1"
                 },
                 "threatInfo": {
-                    # FIXME: Get full list of threat types
-                    "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING"],
-                    "platformTypes": ["WINDOWS"],
+                    "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE"],
+                    "platformTypes": ["ANY_PLATFORM", "WINDOWS", "OSX", "LINUX"],
                     "threatEntryTypes": ["URL"],
                     "threatEntries": [
                         {'url': url}

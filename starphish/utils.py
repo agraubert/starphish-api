@@ -6,6 +6,7 @@ import pandas as pd
 import sqlalchemy as sqla
 from time import monotonic
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 def error(message, *, data=None, context=None, code=400):
     # Maybe log
@@ -42,29 +43,36 @@ def rate_limit(limit):
                 quota = db.query(
                     sqla.select(table).where(
                         table.c.ip == sqla.text("'{}'".format(request.remote_addr))
+                    ).where(
+                        table.c.endpoint == sqla.text("'{}'".format(func.__name__))
                     )
                 )
-                print(quota)
                 if len(quota):
                     if quota['expires'][0] > datetime.now():
-                        if quota['lim'][0] <= 0:
+                        if quota['count'][0] >= limit:
                             return error("Too many requests", data={
                                 "quota_resets": quota['expires'][0],
                             }, code=429)
-                        db._conn.execute(sqla.update(table).where(table.c.ip == request.remote_addr).values(
-                            lim=quota['lim'][0] - 1
+                        db._conn.execute(sqla.update(table).where(table.c.ip == sqla.text("'{}'".format(request.remote_addr))).where(
+                            table.c.endpoint == sqla.text("'{}'".format(func.__name__))
+                        ).values(
+                            count=int(quota['count'][0]) + 1
                         ))
                     else:
-                        db._conn.execute(sqla.update(table).where(table.c.ip == request.remote_addr).values(
+                        db._conn.execute(sqla.update(table).where(table.c.ip == sqla.text("'{}'".format(request.remote_addr))).where(
+                            table.c.endpoint == sqla.text("'{}'".format(func.__name__))
+                        ).values(
                             expires=datetime.now() + timedelta(minutes=1),
-                            lim=limit - 1
+                            count=1,
                         ))
                 else:
                     # db.insert('requests', ip=request.remote_addr, expires=datetime.now()+timedelta(minutes=1), lim=limit-1)
                     db._conn.execute(sqla.insert(db._tables['ratelimit']).values(
                         ip=request.remote_addr,
+                        endpoint=func.__name__,
                         expires=datetime.now() + timedelta(minutes=1),
-                        lim=limit - 1
+                        count=1,
+                        max=limit
                     ))
             return func(*args, **kwargs)
 
@@ -110,6 +118,21 @@ def log_request(func):
     wrapper.not_logged = lambda *args, **kwargs: func(*args, **kwargs)
 
     return wrapper
+
+def standardize_urls(urls):
+    """
+    Standardizes query urls to maximize probability of a match
+    1) Checks the given url (lowercased if no resource path is present)
+    2) If a resource path is given, checks the url with just scheme and base location (lowercased)
+    3) If no scheme is present, checks the url using http and lowercased location
+    """
+    for url in urls:
+        result = urlparse(url.lower())
+        yield url if result.path else url.lower()
+        if result.path:
+            yield '{}{}{}'.format(result.scheme, '://' if result.scheme else '', result.netloc).lower()
+        if not result.scheme:
+            yield 'http://{}'.format(result.netloc).lower()
 
 
 DATABASE = None
@@ -281,7 +304,9 @@ def table_defs(db):
             'ratelimit',
             db.meta,
             sqla.Column('ip', sqla.String(40), primary_key=True),
-            sqla.Column('lim', sqla.Integer),
+            sqla.Column('count', sqla.Integer),
+            sqla.Column('max', sqla.Integer),
+            sqla.Column('endpoint', sqla.String(64), primary_key=True),
             sqla.Column('expires', sqla.DateTime),
             keep_existing=True
         )
