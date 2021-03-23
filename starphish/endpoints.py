@@ -8,11 +8,33 @@ import traceback
 import sqlalchemy as sqla
 from hashlib import sha256
 
-
 @app.errorhandler(404)
 @utils.log_request
 def NotFound(err=None):
     return 'Not Found', 404
+
+@utils.log_request
+def blacklist_ip():
+    with utils.Database.get_db(app.config) as db:
+        db.insert(
+            'blacklist',
+            ip=request.remote_addr,
+            timestamp=datetime.now(),
+            endpoint=request.path[:256]
+        )
+    return "Repeated suspicious activity will result in blacklisting", 404
+
+black_routes = []
+if os.path.exists(os.path.join(os.path.dirname(__file__), 'blacklist.txt')):
+    with open(os.path.join(os.path.dirname(__file__), 'blacklist.txt')) as r:
+        black_routes = [line.strip() for line in r]
+
+if 'BLACKLIST_ROUTES' in app.config:
+    black_routes += app.config['BLACKLIST_ROUTES']
+
+for route in black_routes:
+    blacklist_ip = app.route('/{}'.format(route))(blacklist_ip)
+    print("Blacklisting route", route)
 
 @app.route('/')
 @utils.log_request
@@ -21,7 +43,6 @@ def redir():
 
 @app.route('/api/marco')
 @utils.log_request
-@utils.rate_limit(5)
 def marco():
     return "Polo"
 
@@ -60,9 +81,9 @@ def safebrowse():
         cache_matches = {}
 
         with utils.Database.get_db(app.config) as db:
-            table = db._tables['safebrowse_cache']
+            table = db['safebrowse_cache']
             results = db.query(
-                sqla.select(table).where(
+                table.select.where(
                     table.c.expires > sqla.text(datetime.now().strftime("'%Y-%m-%d %H:%M:%S'"))
                 )
             )
@@ -73,7 +94,6 @@ def safebrowse():
                         cache_matches[url] = results[results['url'] == url].query('type == type')['type'][-1]
                 else:
                     query_urls.append(url)
-        print(query_urls)
 
         response = requests.post(
             'https://safebrowsing.googleapis.com/v4/threatMatches:find',

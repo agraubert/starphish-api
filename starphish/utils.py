@@ -39,9 +39,9 @@ def rate_limit(limit):
             # if 'CUSTOM_LIMITS' in current_app.config and request.remote_addr in current_app.config['CUSTOM_LIMITS']:
             #     limit = current_app.config['CUSTOM_LIMITS'][request.remote_addr]
             with Database.get_db(current_app.config) as db:
-                table = db._tables['ratelimit']
+                table = db['ratelimit']
                 quota = db.query(
-                    sqla.select(table).where(
+                    table.select.where(
                         table.c.ip == sqla.text("'{}'".format(request.remote_addr))
                     ).where(
                         table.c.endpoint == sqla.text("'{}'".format(func.__name__))
@@ -53,13 +53,13 @@ def rate_limit(limit):
                             return error("Too many requests", data={
                                 "quota_resets": quota['expires'][0],
                             }, code=429)
-                        db._conn.execute(sqla.update(table).where(table.c.ip == sqla.text("'{}'".format(request.remote_addr))).where(
+                        db.execute(table.update.where(table.c.ip == sqla.text("'{}'".format(request.remote_addr))).where(
                             table.c.endpoint == sqla.text("'{}'".format(func.__name__))
                         ).values(
                             count=int(quota['count'][0]) + 1
                         ))
                     else:
-                        db._conn.execute(sqla.update(table).where(table.c.ip == sqla.text("'{}'".format(request.remote_addr))).where(
+                        db.execute(table.update.where(table.c.ip == sqla.text("'{}'".format(request.remote_addr))).where(
                             table.c.endpoint == sqla.text("'{}'".format(func.__name__))
                         ).values(
                             expires=datetime.now() + timedelta(minutes=1),
@@ -67,7 +67,7 @@ def rate_limit(limit):
                         ))
                 else:
                     # db.insert('requests', ip=request.remote_addr, expires=datetime.now()+timedelta(minutes=1), lim=limit-1)
-                    db._conn.execute(sqla.insert(db._tables['ratelimit']).values(
+                    db.execute(table.insert.values(
                         ip=request.remote_addr,
                         endpoint=func.__name__,
                         expires=datetime.now() + timedelta(minutes=1),
@@ -132,14 +132,42 @@ def standardize_urls(urls):
     for url in urls:
         result = urlparse(url.lower())
         yield ensure_scheme(url if result.path else url.lower())
-        if result.path and result.netloc:            
+        if result.path and result.netloc:
             yield ensure_scheme(result.netloc.lower())
 
 
 DATABASE = None
 DBL = Lock()
 
+class TableHandle(object):
+    def __init__(self, table):
+        self.table = table
+        self.c = table.c
+
+    @property
+    def select(self):
+        return sqla.select(self.table)
+
+    @property
+    def update(self):
+        return sqla.update(self.table)
+
+    @property
+    def insert(self):
+        return sqla.insert(self.table)
+
+    @property
+    def delete(self):
+        return sqla.delete(self.table)
+
 class Database(object):
+
+    @staticmethod
+    def init_with_url(url):
+        db = Database(url)
+        table_defs(db)
+        return db
+
     @staticmethod
     def get_db(config):
         global DATABASE
@@ -159,6 +187,15 @@ class Database(object):
         self._conn = None
         self._lock = Lock()
         self._tables = {}
+
+    def __getitem__(self, table):
+        """
+        Gets requested table name
+        """
+        self._check_conn()
+        if table not in self._tables:
+            raise NameError("No such table '{}'".format(table))
+        return TableHandle(self._tables[table])
 
     def lock(self):
         """
@@ -206,22 +243,16 @@ class Database(object):
             query = sqla.text(query)
         return pd.read_sql(query, self._conn, params=kwargs if len(kwargs) else None)
 
-    def select(self, table):
-        """
-        Get selector for a table
-        """
-        return sqla.select(self._tables[table])
-
     def insert(self, table, **values):
         self._check_conn()
         # return self._conn.execute(sqla.insert(self._tables[table]).values(values))
-        return self._conn.execute(sqla.insert(self._tables[table]), values)
+        return self._conn.execute(self[table].insert, values)
 
     def multi_insert(self, table, values):
         self._check_conn()
         if not len(values):
             return
-        return self._conn.execute(sqla.insert(self._tables[table]), values)
+        return self._conn.execute(self[table].insert, values)
 
     def execute(self, statement):
         self._check_conn()
@@ -242,6 +273,7 @@ class Database(object):
             *args,
             **kwargs
         )
+        self.meta.create_all()
         self._tables[table_name] = table
         return table
 
@@ -286,10 +318,9 @@ def table_defs(db):
             sqla.Column('endpoint', sqla.String(256)),
             sqla.Column('response_code', sqla.Integer),
             sqla.Column('response_time', sqla.Integer),
-            keep_existing=True,
+            extend_existing=True,
             sqlite_autoincrement=True
         )
-        db.meta.create_all()
         db.create_table(
             'safebrowse_cache',
             db.meta,
@@ -298,9 +329,8 @@ def table_defs(db):
             sqla.Column('expires', sqla.DateTime, primary_key=True),
             sqla.Column('safe', sqla.Boolean, nullable=False),
             sqla.Column('type', sqla.String(64)),
-            keep_existing=True
+            extend_existing=True
         )
-        db.meta.create_all()
         db.create_table(
             'ratelimit',
             db.meta,
@@ -309,6 +339,20 @@ def table_defs(db):
             sqla.Column('max', sqla.Integer),
             sqla.Column('endpoint', sqla.String(64), primary_key=True),
             sqla.Column('expires', sqla.DateTime),
-            keep_existing=True
+            extend_existing=True
         )
-        db.meta.create_all()
+        db.create_table(
+            'blacklist',
+            db.meta,
+            sqla.Column('ip', sqla.String(40), primary_key=True),
+            sqla.Column('endpoint', sqla.String(256)),
+            sqla.Column('timestamp', sqla.DateTime, primary_key=True),
+            extend_existing=True
+        )
+
+def export_blacklist_ips(url, delete=False):
+    with Database.init_with_url(url) as db:
+        df = db.query(sqla.select(sqla.distinct(db['blacklist'].c.ip)))
+        if delete:
+            db.execute(db['blacklist'].delete)
+        return df
