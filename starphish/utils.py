@@ -120,7 +120,8 @@ def log_request(func):
     return wrapper
 
 def ensure_scheme(url):
-    return "http://{}".format(url) if not urlparse(url).scheme else url
+    result = urlparse(url)
+    return "http://{}".format(url) if not (result.scheme and url.startswith('{}://'.format(result.scheme))) else url
 
 def standardize_urls(urls):
     """
@@ -132,6 +133,7 @@ def standardize_urls(urls):
     for url in urls:
         result = urlparse(url.lower())
         yield ensure_scheme(url if result.path else url.lower())
+        result = urlparse(ensure_scheme(url.lower()))
         if result.path and result.netloc:
             yield ensure_scheme(result.netloc.lower())
 
