@@ -55,6 +55,21 @@ def request_logs():
     with utils.Database.get_db(app.config) as db:
         return db.read_table('requests').set_index('id').to_html(), 200
 
+@app.route('/api/safebrowse/hot')
+@utils.log_request
+@utils.rate_limit(10)
+def hot_queries(): # in your area
+    with utils.Database.get_db(app.config) as db:
+        table = db['safebrowse_cache']
+        df = db.query(
+            sqla.select(
+                table.c.url, sqla.func.count()
+            ).select_from(table.table).where(
+                table.c.expires > sqla.text(datetime.now().strftime("'%Y-%m-%d %H:%M:%S'"))
+            ).group_by(table.c.url).limit(5)
+        )
+    return df.set_index('url').rename({'count_1': 'count'}, axis='columns').to_json(), 200
+
 @app.route('/api/safebrowse', methods=['POST'])
 @utils.log_request
 @utils.enforce_content_length
