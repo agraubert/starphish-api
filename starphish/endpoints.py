@@ -94,6 +94,7 @@ def safebrowse():
 
         query_urls = []
         cache_matches = {}
+        actual_urls = []
 
         with utils.Database.get_db(app.config) as db:
             table = db['safebrowse_cache']
@@ -103,6 +104,7 @@ def safebrowse():
                 )
             )
             for url in utils.standardize_urls(data['urls']):
+                actual_urls.append(url)
                 if url in results['url'].unique():
                     cached = True
                     if not results[results['url'] == url]['safe'].all():
@@ -165,6 +167,7 @@ def safebrowse():
         return {
             'success': True,
             'length': len(cache_matches) + (len(response_data['matches']) if 'matches' in response_data else 0),
+            'urls_standardized': actual_urls,
             'matches': [
                 {
                     'url': url,
