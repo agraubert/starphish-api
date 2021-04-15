@@ -46,7 +46,7 @@ def hot():
                     datetime.now() - timedelta(days=1)
                 ).strftime("'%Y-%m-%d %H:%M:%S'"))
             ).group_by(table.c.url).having(
-                (sqla.func.count() > 25) | (~table.c.safe)
+                (sqla.func.count() > 25) | (sqla.func.sum(table.c.safe) == 0)
             ).order_by(sqla.desc(sqla.func.count())).limit(5)
         )
     return df.set_index('url').rename({'count_1': 'count', 'max_1': 'last_report'}, axis='columns')
