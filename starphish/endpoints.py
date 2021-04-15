@@ -58,7 +58,7 @@ def request_logs():
 
 @app.route('/api/_internal/request_log/recent')
 @utils.log_request
-def request_logs():
+def request_recent_logs():
     if 'token' not in request.args or request.args['token'] != app.config['INTERNAL_TOKEN']:
         return NotFound.not_logged()
 
