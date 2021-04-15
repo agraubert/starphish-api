@@ -1,5 +1,5 @@
 from .app import app
-from . import utils
+from . import utils, feed
 from flask import request, redirect
 import requests
 import os
@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import traceback
 import sqlalchemy as sqla
 from hashlib import sha256
+import pandas as pd
 
 @app.errorhandler(404)
 @utils.log_request
@@ -62,18 +63,7 @@ def hot_queries(): # in your area
     """
     Get a list of the top 5 safebrowse queries from the last day (ish)
     """
-    with utils.Database.get_db(app.config) as db:
-        table = db['safebrowse_cache']
-        df = db.query(
-            sqla.select(
-                table.c.url, sqla.func.count()
-            ).select_from(table.table).where(
-                table.c.expires > sqla.text((
-                    datetime.now() - timedelta(days=1)
-                ).strftime("'%Y-%m-%d %H:%M:%S'"))
-            ).group_by(table.c.url).order_by(sqla.desc(sqla.func.count())).limit(5)
-        )
-    return df.set_index('url').rename({'count_1': 'count'}, axis='columns').to_json(), 200
+    return feed.hot().to_json(), 200
 
 @app.route('/api/safebrowse', methods=['POST'])
 @utils.log_request
@@ -198,4 +188,35 @@ def safebrowse():
                 'traceback': traceback.format_exc()
             },
             code=500
+        )
+
+@app.route('/api/feed')
+@utils.log_request
+@utils.rate_limit(12)
+def generate_feed():
+    def record_source(df, source):
+        df['source'] = [source]*len(df)
+        return df
+    try:
+        feed_type = request.args.get('type', 'all')
+        if feed_type not in feed.PROVIDERS:
+            return utils.error(
+                "Invalid feed type",
+                data={'allowed_types': [*feed.PROVIDERS], 'requested_type': feed_type},
+                code=400
+            )
+        elif feed_type != 'all':
+            return feed.PROVIDERS[feed_type]().to_json(orient='index'), 200
+        return pd.concat([
+            record_source(provider(), source)
+            for source, provider in feed.PROVIDERS.items()
+            if provider is not None
+        ], axis='rows').to_json(orient='index'), 200
+
+    except:
+        return utils.error(
+            "Unexpected internal server error",
+            data={
+                'traceback': traceback.format_exc()
+            }, code=500
         )

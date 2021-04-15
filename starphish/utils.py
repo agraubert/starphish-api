@@ -351,6 +351,22 @@ def table_defs(db):
             sqla.Column('timestamp', sqla.DateTime, primary_key=True),
             extend_existing=True
         )
+        db.create_table(
+            'phishtank',
+            db.meta,
+            sqla.Column('url_hash', sqla.String(64), primary_key=True),
+            sqla.Column('url', sqla.Text, nullable=False),
+            sqla.Column('added', sqla.DateTime, primary_key=True),
+            extend_existing=True
+        )
+        db.create_table(
+            'phishtank_log',
+            db.meta,
+            sqla.Column('time', sqla.DateTime, primary_key=True),
+            sqla.Column('length', sqla.Integer),
+            sqla.Column('hash', sqla.String(64), nullable=False),
+            extend_existing=True
+        )
 
 def export_blacklist_ips(url, delete=False):
     with Database.init_with_url(url) as db:
