@@ -65,7 +65,7 @@ def request_recent_logs():
     with utils.Database.get_db(app.config) as db:
         table = db['requests']
         return db.query(
-            table.select.order_by(sqa.asc(table.c.id)).limit(1000)
+            table.select.order_by(sqla.asc(table.c.id)).limit(1000)
         ).set_index('id').to_html(), 200
 
 @app.route('/api/safebrowse/hot')
