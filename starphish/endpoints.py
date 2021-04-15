@@ -56,6 +56,18 @@ def request_logs():
     with utils.Database.get_db(app.config) as db:
         return db.read_table('requests').set_index('id').to_html(), 200
 
+@app.route('/api/_internal/request_log/recent')
+@utils.log_request
+def request_logs():
+    if 'token' not in request.args or request.args['token'] != app.config['INTERNAL_TOKEN']:
+        return NotFound.not_logged()
+
+    with utils.Database.get_db(app.config) as db:
+        table = db['requests']
+        return db.query(
+            table.select.order_by(sqa.asc(table.c.id)).limit(1000)
+        ).set_index('id').to_html(), 200
+
 @app.route('/api/safebrowse/hot')
 @utils.log_request
 @utils.rate_limit(10)
