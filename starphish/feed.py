@@ -21,7 +21,7 @@ def phishtank():
         )
         results = db.query(
             table.select.where(
-                table.c.added > sqla.text((maxt['max_1'][0] - timedelta(hours=1)).strftime("'%Y-%m-%d %H:%M:%S'"))
+                table.c.added > sqla.text((maxt['max_1'][0] - timedelta(minutes=5)).strftime("'%Y-%m-%d %H:%M:%S'"))
             )
         )
     results = results.set_index('url').sort_values('added')
