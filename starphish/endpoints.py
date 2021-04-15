@@ -232,3 +232,23 @@ def generate_feed():
                 'traceback': traceback.format_exc()
             }, code=500
         )
+
+@app.route('/api/visitors')
+@utils.log_request
+def visitor_count():
+    with utils.Database.get_db(app.config) as db:
+        table = db['requests']
+        return {
+            'total': int(
+                db.query(
+                    sqla.select(sqla.func.count(sqla.distinct(table.c.ip))).select_from(table.table)
+                )['count_1'][0]
+            ),
+            'today': int(
+                db.query(
+                    sqla.select(sqla.func.count(sqla.distinct(table.c.ip))).select_from(table.table).where(
+                        table.c.time > sqla.text((datetime.now() - timedelta(days=1)).strftime("'%Y-%m-%d %H:%M:%S'"))
+                    )
+                )['count_1'][0]
+            )
+        }, 200
