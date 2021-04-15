@@ -242,7 +242,7 @@ def visitor_count():
             'total': int(
                 db.query(
                     sqla.select(sqla.func.count(sqla.distinct(table.c.ip))).select_from(table.table).where(
-                        table.c.endpoint = sqla.text('"/ (redir)"')
+                        table.c.endpoint == sqla.text('"/ (redir)"')
                     )
                 )['count_1'][0]
             ),
@@ -251,7 +251,7 @@ def visitor_count():
                     sqla.select(sqla.func.count(sqla.distinct(table.c.ip))).select_from(table.table).where(
                         table.c.time > sqla.text((datetime.now() - timedelta(days=1)).strftime("'%Y-%m-%d %H:%M:%S'"))
                     ).where(
-                        table.c.endpoint = sqla.text('"/ (redir)"')
+                        table.c.endpoint == sqla.text('"/ (redir)"')
                     )
                 )['count_1'][0]
             )
