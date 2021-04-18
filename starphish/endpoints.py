@@ -231,8 +231,8 @@ def generate_feed():
             record_source(provider(), source)
             for source, provider in feed.PROVIDERS.items()
             if provider is not None
-        ], axis='rows')
-        merged_df = merged_df[~merged_df.index.duplicated(keep='last')]
+        ], axis='rows').sort_values('last_report', ascending=False)
+        merged_df = merged_df[~merged_df.index.duplicated(keep='first')]
         return merged_df.to_json(orient='index'), 200
 
     except:
