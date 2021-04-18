@@ -123,7 +123,7 @@ def safebrowse():
                 if url in results['url'].unique():
                     cached = True
                     if not results[results['url'] == url]['safe'].all():
-                        cache_matches[url] = results[results['url'] == url].query('type == type')['type'][-1]
+                        cache_matches[url] = results[results['url'] == url].query('type == type')['type'].values[-1]
                 else:
                     query_urls.append(url)
 
