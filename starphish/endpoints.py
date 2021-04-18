@@ -227,11 +227,13 @@ def generate_feed():
             )
         elif feed_type != 'all':
             return feed.PROVIDERS[feed_type]().to_json(orient='index'), 200
-        return pd.concat([
+        merged_df =  pd.concat([
             record_source(provider(), source)
             for source, provider in feed.PROVIDERS.items()
             if provider is not None
-        ], axis='rows').to_json(orient='index'), 200
+        ], axis='rows')
+        merged_df = merged_df[~merged_df.index.duplicated(keep='last')]
+        return merged_df.to_json(orient='index'), 200
 
     except:
         return utils.error(
