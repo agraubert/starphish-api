@@ -104,7 +104,7 @@ def safebrowse():
         actual_urls = []
 
         with utils.Database.get_db(app.config) as db:
-            pt = db['phishtank']
+            pt = db['phishing']
             table = db['safebrowse_cache']
             results = db.query(
                 table.select.where(
@@ -207,7 +207,8 @@ def safebrowse():
 @utils.rate_limit(12)
 def generate_feed():
     def record_source(df, source):
-        df['source'] = [source]*len(df)
+        if 'source' not in df:
+            df['source'] = [source]*len(df)
         return df
     try:
         feed_type = request.args.get('type', 'all')

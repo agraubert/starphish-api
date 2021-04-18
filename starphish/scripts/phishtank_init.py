@@ -36,7 +36,8 @@ if __name__ == '__main__':
                     {
                         'url': line.strip(),
                         'url_hash': sha256(line.strip().encode()).hexdigest(),
-                        'added': datetime.now()
+                        'added': datetime.now(),
+                        'source': 'phishtank'
                     }
                     for line in response.text.split('\n')
                     if len(line.strip())
@@ -44,7 +45,7 @@ if __name__ == '__main__':
                 for chunk in agutil.clump(update, 100):
                     chunk = [*chunk]
                     db.multi_insert(
-                        'phishtank',
+                        'phishing',
                         chunk
                     )
                     print("Added", len(chunk), "links")

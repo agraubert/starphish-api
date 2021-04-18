@@ -137,7 +137,6 @@ def standardize_urls(urls):
         if result.path and result.netloc:
             yield ensure_scheme(result.netloc.lower())
 
-
 DATABASE = None
 DBL = Lock()
 
@@ -165,8 +164,8 @@ class TableHandle(object):
 class Database(object):
 
     @staticmethod
-    def init_with_url(url):
-        db = Database(url)
+    def init_with_url(url, **kwargs):
+        db = Database(url, **kwargs)
         table_defs(db)
         return db
 
@@ -352,9 +351,10 @@ def table_defs(db):
             extend_existing=True
         )
         db.create_table(
-            'phishtank',
+            'phishing',
             db.meta,
             sqla.Column('url_hash', sqla.String(64), primary_key=True),
+            sqla.Column('source', sqla.String(16)),
             sqla.Column('url', sqla.Text, nullable=False),
             sqla.Column('added', sqla.DateTime, primary_key=True),
             extend_existing=True
@@ -367,6 +367,7 @@ def table_defs(db):
             sqla.Column('hash', sqla.String(64), nullable=False),
             extend_existing=True
         )
+
 
 def export_blacklist_ips(url, delete=False):
     with Database.init_with_url(url) as db:

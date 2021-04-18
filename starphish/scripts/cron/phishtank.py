@@ -36,13 +36,14 @@ if __name__ == '__main__':
                     {
                         'url': line.strip(),
                         'url_hash': sha256(line.strip().encode()).hexdigest(),
-                        'added': datetime.now()
+                        'added': datetime.now(),
+                        'source': 'phishtank'
                     }
                     for line in response.text.split('\n')
                     if len(line.strip())
                 ]
                 db.multi_insert(
-                    'phishtank',
+                    'phishing',
                     update
                 )
                 print("Added", len(update), "links")

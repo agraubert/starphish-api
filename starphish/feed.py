@@ -10,12 +10,12 @@ def mark_provider(func):
     return func
 
 @mark_provider
-def phishtank():
+def phishing():
     """
     Fetch the latest phishtank results for the feed
     """
     with utils.Database.get_db(current_app.config) as db:
-        table = db['phishtank']
+        table = db['phishing']
         maxt = db.query(
             sqla.select(sqla.func.max(table.c.added)).select_from(table.table)
         )
@@ -26,7 +26,7 @@ def phishtank():
         )
     results = results.set_index('url').sort_values('added')
     results = results[~results.index.duplicated(keep='last')]
-    return results[['added']].rename({'added': 'last_report'}, axis='columns')
+    return results[['added', 'source']].rename({'added': 'last_report'}, axis='columns')
 
 
 @mark_provider
