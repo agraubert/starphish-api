@@ -104,6 +104,7 @@ def safebrowse():
         actual_urls = []
 
         with utils.Database.get_db(app.config) as db:
+            pt = db['phishtank']
             table = db['safebrowse_cache']
             results = db.query(
                 table.select.where(
@@ -112,6 +113,13 @@ def safebrowse():
             )
             for url in utils.standardize_urls(data['urls']):
                 actual_urls.append(url)
+                pt_result = db.query(
+                    pt.select.where(
+                        pt.c.url == url
+                    )
+                )
+                if len(pt_result):
+                    cache_matches[url] = 'SOCIAL_ENGINEERING'
                 if url in results['url'].unique():
                     cached = True
                     if not results[results['url'] == url]['safe'].all():
