@@ -169,15 +169,7 @@ def safebrowse():
                         'type': match['threatType']
                     }
                     for match in response_data['matches']
-                ] if 'matches' in response_data else []) + [
-                    {
-                        'url': url,
-                        'url_hash': sha256(url.encode()).hexdigest(),
-                        'expires': now + timedelta(seconds=60),
-                        'safe': True,
-                    }
-                    for url in query_urls if url not in unsafe
-                ]
+                ] if 'matches' in response_data else [])
             )
         return {
             'success': True,
