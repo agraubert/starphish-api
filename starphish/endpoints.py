@@ -157,6 +157,13 @@ def safebrowse():
         unsafe = {match['threat']['url'] for match in response_data['matches']} if 'matches' in response_data else set()
         now = datetime.now()
 
+        def inline_filter(data):
+            seen = set()
+            for match in data:
+                if match['threat']['url'] not in seen:
+                    yield match
+                seen.add(match['threat']['url'])
+
         with utils.Database.get_db(app.config) as db:
             db.multi_insert(
                 'safebrowse_cache',
@@ -168,7 +175,7 @@ def safebrowse():
                         'safe': False,
                         'type': match['threatType']
                     }
-                    for match in response_data['matches']
+                    for match in inline_filter(response_data['matches'])
                 ] if 'matches' in response_data else [])
             )
         return {
