@@ -15,11 +15,6 @@ if __name__ == '__main__':
     with utils.Database(args.url, echo=True) as db:
         db.execute(
             sqla.text(
-                "begin transaction;"
-            )
-        )
-        db.execute(
-            sqla.text(
                 "alter table phishtank add column source varchar(16);"
             )
         )
@@ -31,10 +26,5 @@ if __name__ == '__main__':
         db.execute(
             sqla.text(
                 "alter table phishtank rename to phishing;"
-            )
-        )
-        db.execute(
-            sqla.text(
-                "commit;"
             )
         )

@@ -32,3 +32,22 @@ You can check SQLAlchemy's docs for instructions on configuring for different da
 ## Running
 
 From the root of the repository, run `python -m starphish`
+
+## Scripts
+
+### Database Imports
+
+* `scripts/phishtank_init.py`: This script loads the current state of the [Phishtank](https://github.com/mitchellkrogza/Phishing.Database)
+database into starphish's local database.
+* `scripts/cron/phishtank.py`: This script loads periodic updates to Phishtank into
+the local database. Phishtank updates every few hours so it's best to schedule a
+cron job to run this hourly
+* `scripts/aa419.py`: This script loads the [aa419](https://db.aa419.org/fakebankslist.php)
+database into starphish. Since aa419 does not have an API, this is a web scraper
+which takes about 15 hours to download the full dataset.
+
+### Migrations
+
+For new users, you won't have to use migrations. However, existing starphish instances
+need to run new migration scripts when they are released to keep their databases
+consistent.
