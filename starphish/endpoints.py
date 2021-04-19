@@ -1,6 +1,6 @@
 from .app import app
 from . import utils, feed
-from flask import request, redirect
+from flask import request, redirect, make_response
 import requests
 import os
 from datetime import datetime, timedelta
@@ -289,16 +289,37 @@ ITEM_TEMPLATE = """<item>
 </item>
 """
 
+def generate_rss_content():
+    def record_source(df, source):
+        if 'source' not in df:
+            df['source'] = [source]*len(df)
+        return df
+    feed_type = request.args.get('type', 'all')
+    if feed_type not in feed.PROVIDERS:
+        raise RuntimeError("Lazy")
+    elif feed_type != 'all':
+        return feed.PROVIDERS[feed_type]().to_dict(orient='index')
+    merged_df =  pd.concat([
+        record_source(provider(), source)
+        for source, provider in feed.PROVIDERS.items()
+        if provider is not None
+    ], axis='rows').sort_values('last_report', ascending=False)
+    merged_df = merged_df[~merged_df.index.duplicated(keep='first')]
+    return merged_df.to_dict(orient='index')
+
 @app.route("/rss")
-@utils.log_request
 def rss():
-    feed_content, _ = generate_feed.not_logged()
-    return RSS_TEMPLATE.format(items="\n".join(
-        ITEM_TEMPLATE.format(
-            title="title",
-            url=key,
-            date=data['last_report'],
-            source=data['source'],
-        )
-        for key, data in json.loads(feed_content).items()
-    )), 200
+    feed_content = generate_rss_content()
+    response = make_response(
+        RSS_TEMPLATE.format(items="\n".join(
+            ITEM_TEMPLATE.format(
+                title="title",
+                url=key,
+                date=data['last_report'].strftime("%a, %d %b %Y %H:%M:%S"),
+                source=data['source'],
+            )
+            for key, data in feed_content.items()
+        )), 200
+    )
+    response.headers['Content-Type'] = 'application/rss+xml'
+    return response
