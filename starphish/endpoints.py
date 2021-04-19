@@ -282,7 +282,6 @@ RSS_TEMPLATE = """<?xml version="1.0" encoding="utf-8"?>
 
 ITEM_TEMPLATE = """<item>
 <title>{title}</title>
-<link>{url}</link>
 <guid>{title}</guid>
 <pubDate>{date}</pubDate>
 <description>Malicious phishing site reported by {source}</description>
