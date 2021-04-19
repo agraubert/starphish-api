@@ -8,6 +8,7 @@ import traceback
 import sqlalchemy as sqla
 from hashlib import sha256
 import pandas as pd
+import json
 
 @app.errorhandler(404)
 @utils.log_request
@@ -266,3 +267,40 @@ def visitor_count():
                 )['count_1'][0]
             )
         }, 200
+
+
+RSS_TEMPLATE = """
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+<channel>
+<title>Starphish Phishing Threat Feed</title>
+<link>https://starphish.org/api/feed</link>
+<description>Recent Phishing Threats</description>
+{items}
+</channel>
+</rss>
+"""
+
+ITEM_TEMPLATE = """
+<item>
+<title>{title}</title>
+<link>{url}</link>
+<guid>{url}</guid>
+<pubDate>{date}</pubDate>
+<description>From {source}</description>
+</item>
+"""
+
+@app.route("/rss")
+@utils.log_request
+def rss():
+    feed_content, _ = generate_feed.not_logged()
+    return RSS_TEMPLATE.format(items="\n".join(
+        ITEM_TEMPLATE.format(
+            title="title",
+            url=key,
+            date=data['last_report'],
+            source=data['source'],
+        )
+        for key, data in json.loads(feed_content).items()
+    )), 200
