@@ -285,7 +285,7 @@ ITEM_TEMPLATE = """<item>
 <link>{url}</link>
 <guid>{url}</guid>
 <pubDate>{date}</pubDate>
-<description>From {source}</description>
+<description>Malicious phishing site reported by {source}</description>
 </item>
 """
 
@@ -313,8 +313,8 @@ def rss():
     response = make_response(
         RSS_TEMPLATE.format(items="\n".join(
             ITEM_TEMPLATE.format(
-                title="title",
-                url=key,
+                title=key,
+                url="#",
                 date=data['last_report'].strftime("%a, %d %b %Y %H:%M:%S -0600"),
                 source=data['source'],
             )
