@@ -269,8 +269,7 @@ def visitor_count():
         }, 200
 
 
-RSS_TEMPLATE = """
-<?xml version="1.0" encoding="utf-8"?>
+RSS_TEMPLATE = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0">
 <channel>
 <title>Starphish Phishing Threat Feed</title>
@@ -281,8 +280,7 @@ RSS_TEMPLATE = """
 </rss>
 """
 
-ITEM_TEMPLATE = """
-<item>
+ITEM_TEMPLATE = """<item>
 <title>{title}</title>
 <link>{url}</link>
 <guid>{url}</guid>
