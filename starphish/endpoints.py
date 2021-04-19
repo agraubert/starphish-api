@@ -315,7 +315,7 @@ def rss():
             ITEM_TEMPLATE.format(
                 title="title",
                 url=key,
-                date=data['last_report'].strftime("%a, %d %b %Y %H:%M:%S"),
+                date=data['last_report'].strftime("%a, %d %b %Y %H:%M:%S -0600"),
                 source=data['source'],
             )
             for key, data in feed_content.items()
